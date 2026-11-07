@@ -1,15 +1,17 @@
 import mimetypes
 from dataclasses import dataclass
 from email.message import EmailMessage
+from pathlib import Path
 from typing import Literal
 
-Kind = Literal["document", "audio", "image"]
+Kind = Literal["document", "audio", "image", "video"]
 
 # MIME types accepted by the Gemini Interactions API (google-genai 3.0).
 SUPPORTED_TYPES: dict[str, Kind] = {
     "application/pdf": "document",
     "application/msword": "document",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.template": "document",
     "application/vnd.ms-excel": "document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "document",
     "application/vnd.ms-powerpoint": "document",
@@ -27,6 +29,10 @@ SUPPORTED_TYPES: dict[str, Kind] = {
     "audio/opus": "audio",
     "audio/flac": "audio",
     "audio/aiff": "audio",
+    "audio/webm": "audio",
+    "audio/l16": "audio",
+    "audio/alaw": "audio",
+    "audio/mulaw": "audio",
     "image/jpeg": "image",
     "image/png": "image",
     "image/webp": "image",
@@ -35,6 +41,15 @@ SUPPORTED_TYPES: dict[str, Kind] = {
     "image/heif": "image",
     "image/bmp": "image",
     "image/tiff": "image",
+    "video/mp4": "video",
+    "video/mpeg": "video",
+    "video/mpg": "video",
+    "video/mov": "video",
+    "video/avi": "video",
+    "video/x-flv": "video",
+    "video/webm": "video",
+    "video/wmv": "video",
+    "video/3gpp": "video",
 }
 
 # Non-standard names that mail clients and phones commonly send.
@@ -49,6 +64,20 @@ TYPE_ALIASES = {
     "audio/x-aiff": "audio/aiff",
     "image/jpg": "image/jpeg",
     "image/pjpeg": "image/jpeg",
+    "video/quicktime": "video/mov",
+    "video/x-msvideo": "video/avi",
+    "video/vnd.avi": "video/avi",
+    "video/x-ms-wmv": "video/wmv",
+    # 3GP containers may hold audio only; Gemini handles audio-only files sent as video.
+    "audio/3gpp": "video/3gpp",
+}
+
+# Extensions Python's mimetypes doesn't know. Ambiguous containers (.webm) resolve to
+# video on purpose: Gemini processes audio-only files sent as video, but drops the
+# picture of a video sent as audio.
+EXTENSION_TYPES = {
+    ".dotx": "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    ".flv": "video/x-flv",
 }
 
 # Gemini caps a request at 20 MB including base64 overhead (+33 %), so raw bytes must stay well below.
@@ -75,6 +104,9 @@ def normalize_mime_type(content_type: str, filename: str) -> str:
     if mime_type in SUPPORTED_TYPES:
         return mime_type
     # Fall back to the extension, e.g. for generic application/octet-stream.
+    extension = Path(filename).suffix.lower()
+    if extension in EXTENSION_TYPES:
+        return EXTENSION_TYPES[extension]
     guessed, _ = mimetypes.guess_type(filename)
     if guessed:
         guessed = TYPE_ALIASES.get(guessed, guessed)

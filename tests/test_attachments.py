@@ -47,6 +47,13 @@ def test_text_bodies_are_not_attachments():
         ("image/jpg", "a.jpg", "image/jpeg"),
         ("application/octet-stream", "report.pdf", "application/pdf"),
         ("application/octet-stream", "memo.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        ("audio/webm", "voice.webm", "audio/webm"),
+        ("video/webm", "screen.webm", "video/webm"),
+        ("application/octet-stream", "unknown.webm", "video/webm"),
+        ("video/quicktime", "iphone.MOV", "video/mov"),
+        ("application/octet-stream", "clip.mp4", "video/mp4"),
+        ("application/octet-stream", "old_phone.3gp", "video/3gpp"),
+        ("application/octet-stream", "template.DOTX", "application/vnd.openxmlformats-officedocument.wordprocessingml.template"),
         ("application/zip", "archive.zip", "application/zip"),
     ],
 )
@@ -96,3 +103,22 @@ def test_inline_pasted_image_is_extracted():
     found, _ = extract_attachments(msg)
 
     assert [(a.kind, a.data) for a in found] == [("image", b"\x89PNGshot")]
+
+
+def test_supported_types_match_gemini_sdk():
+    # Reads the SDK's (private) type definitions on purpose: an SDK upgrade that adds
+    # or removes formats makes this test fail, so the list never silently drifts.
+    from typing import get_args
+
+    from google.genai._gaos.types.interactions import audiocontent, documentcontent, imagecontent, videocontent
+
+    def sdk_types(alias):
+        return set(get_args(get_args(alias)[0]))
+
+    expected = {
+        **dict.fromkeys(sdk_types(documentcontent.DocumentContentMimeType), "document"),
+        **dict.fromkeys(sdk_types(audiocontent.AudioContentMimeType), "audio"),
+        **dict.fromkeys(sdk_types(imagecontent.ImageContentMimeType), "image"),
+        **dict.fromkeys(sdk_types(videocontent.VideoContentMimeType), "video"),
+    }
+    assert att.SUPPORTED_TYPES == expected
