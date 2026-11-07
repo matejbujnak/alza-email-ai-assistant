@@ -2,6 +2,10 @@
 
 Proof of concept of an AI assistant that reads incoming emails and replies in the original thread using Gemini.
 
+## Knowledge base
+
+`knowledge/alzacare-plus/` contains the documents the assistant answers company-specific questions from. **AlzaCare+ is a fictional service created for this proof of concept**; its name, prices and terms are invented and do not describe any real Alza product or its actual terms.
+
 ## Development
 
 Requires [uv](https://docs.astral.sh/uv/).
