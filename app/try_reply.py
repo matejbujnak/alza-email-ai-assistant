@@ -32,7 +32,7 @@ def main() -> None:
     msg.set_content(args.body)
     email = parse_email(msg.as_bytes(), gmail_id="local", thread_id="local")
 
-    if reason := skip_reason(email, bot_address="bot@example.com"):
+    if reason := skip_reason(email, own_address="bot@example.com"):
         print(f"Skipped: {reason}")
         return
 
