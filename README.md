@@ -14,7 +14,7 @@ cp .env.example .env         # then fill in your values
 | Command                                                         | What it does                                                                   |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `uv run python -m app.processor`                                | Process unread emails in the bot inbox and reply                               |
-| `uv run python -m app.try_reply --body "..." [--subject "..."]` | Print the bot's reply to a hand-written email; nothing is sent                 |
+| `uv run python -m app.try_reply --body "..." [--subject "..."] [--attach file]` | Print the bot's reply to a hand-written email; nothing is sent; `--attach` is repeatable |
 | `uv run pytest`                                                 | Fast offline tests (no Gmail, no Gemini)                                       |
 | `uv run pytest -m live -s`                                      | Behavioural tests against the real Gemini API; prints replies for human review |
 
@@ -29,6 +29,17 @@ cp .env.example .env         # then fill in your values
 
 Gmail access uses OAuth: put the OAuth client file at `credentials.json`; the first run opens a browser and stores the token in `token.json`. Both files are git-ignored.
 
+## Attachments
+
+Supported attachments are sent to Gemini inline together with the email text:
+
+- **Documents:** PDF, Word, Excel (first sheet only), PowerPoint, OpenDocument, CSV
+- **Audio:** MP3, WAV, M4A, AAC, OGG, Opus, FLAC, AIFF, WebM
+- **Images:** JPEG, PNG, WebP, GIF, HEIC/HEIF, BMP, TIFF
+- **Video:** MP4, MOV, WebM, AVI, MPEG, WMV, FLV, 3GP (a `.webm` of unknown type is sent as video: Gemini also handles audio-only files that way, whereas a video sent as audio loses its picture)
+
+Unsupported, empty or oversized files are skipped and listed in the prompt, so the reply can tell the customer which file couldn't be read. At most 10 attachments and 14 MB in total are processed (Gemini's 20 MB request limit including base64 overhead).
+
 ## Security
 
 An auto-responder can be abused to send email to third parties (e.g. a forged `From`/`Reply-To` pointing at a victim). Current safeguards:
@@ -42,4 +53,5 @@ An auto-responder can be abused to send email to third parties (e.g. a forged `F
 ### Known limitations
 
 - **No rate limiting yet:** a sender with a properly authenticated domain could still set `Reply-To` to a victim. Planned: per-recipient and global reply limits.
+- **Attachments over 14 MB are skipped:** Gmail allows up to 25 MB. Larger files could be sent via the Gemini Files API, which however keeps uploaded files for up to 48 hours.
 - **No output validation yet:** a prompt injection could make the model include arbitrary links. Planned: block links outside an allow-list of domains.
