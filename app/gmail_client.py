@@ -1,3 +1,9 @@
+import base64
+from dataclasses import dataclass
+from email import policy
+from email.message import EmailMessage
+from email.parser import BytesParser
+from email.utils import parseaddr
 from pathlib import Path
 
 from google.auth.exceptions import RefreshError
@@ -12,6 +18,18 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CREDENTIALS_FILE = PROJECT_ROOT / "credentials.json"
 TOKEN_FILE = PROJECT_ROOT / "token.json"
+
+
+@dataclass(frozen=True)
+class IncomingEmail:
+    id: str
+    thread_id: str
+    message_id: str
+    sender: str
+    reply_to: str
+    subject: str
+    body: str
+    mime: EmailMessage
 
 
 def get_credentials() -> Credentials:
@@ -34,50 +52,61 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=get_credentials())
 
 
-def list_unread(service, max_results: int = 10) -> list[dict]:
+def get_bot_address(service) -> str:
+    return service.users().getProfile(userId="me").execute()["emailAddress"]
+
+
+def list_unread_ids(service, max_results: int = 10) -> list[str]:
     response = (
         service.users()
         .messages()
         .list(userId="me", q="is:unread in:inbox", maxResults=max_results)
         .execute()
     )
-
-    emails = []
-    for ref in response.get("messages", []):
-        msg = (
-            service.users()
-            .messages()
-            .get(
-                userId="me",
-                id=ref["id"],
-                format="metadata",
-                metadataHeaders=["From", "Subject"],
-            )
-            .execute()
-        )
-        headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}
-        emails.append(
-            {
-                "id": msg["id"],
-                "thread_id": msg["threadId"],
-                "from": headers.get("From", ""),
-                "subject": headers.get("Subject", "(no subject)"),
-                "snippet": msg.get("snippet", ""),
-            }
-        )
-    return emails
+    return [ref["id"] for ref in response.get("messages", [])]
 
 
-if __name__ == "__main__":
-    gmail = get_gmail_service()
-    profile = gmail.users().getProfile(userId="me").execute()
-    print(f"Logged in as: {profile['emailAddress']}\n")
+def get_email(service, message_id: str) -> IncomingEmail:
+    msg = service.users().messages().get(userId="me", id=message_id, format="raw").execute()
+    mime = BytesParser(policy=policy.default).parsebytes(base64.urlsafe_b64decode(msg["raw"]))
 
-    unread = list_unread(gmail)
-    if not unread:
-        print("No unread emails.")
-    for e in unread:
-        print(f"- From:    {e['from']}")
-        print(f"  Subject: {e['subject']}")
-        print(f"  Snippet: {e['snippet'][:80]}")
-        print(f"  (id={e['id']}, thread={e['thread_id']})\n")
+    body_part = mime.get_body(preferencelist=("plain", "html"))
+    sender = parseaddr(mime.get("From", ""))[1]
+
+    return IncomingEmail(
+        id=msg["id"],
+        thread_id=msg["threadId"],
+        message_id=mime.get("Message-ID", ""),
+        sender=sender,
+        reply_to=parseaddr(mime.get("Reply-To", ""))[1] or sender,
+        subject=mime.get("Subject", ""),
+        body=body_part.get_content() if body_part else "",
+        mime=mime,
+    )
+
+
+def send_reply(service, original: IncomingEmail, text: str) -> None:
+    reply = EmailMessage()
+    reply["To"] = original.reply_to
+    reply["Subject"] = (
+        original.subject
+        if original.subject.lower().startswith("re:")
+        else f"Re: {original.subject}"
+    )
+    # Threading headers so the reply is grouped correctly in any mail client, not just Gmail.
+    reply["In-Reply-To"] = original.message_id
+    reply["References"] = f"{original.mime.get('References', '')} {original.message_id}".strip()
+    # RFC 3834: tells other auto-responders not to reply to us (prevents bot loops).
+    reply["Auto-Submitted"] = "auto-replied"
+    reply.set_content(text)
+
+    raw = base64.urlsafe_b64encode(reply.as_bytes()).decode()
+    service.users().messages().send(
+        userId="me", body={"raw": raw, "threadId": original.thread_id}
+    ).execute()
+
+
+def mark_as_read(service, message_id: str) -> None:
+    service.users().messages().modify(
+        userId="me", id=message_id, body={"removeLabelIds": ["UNREAD"]}
+    ).execute()
