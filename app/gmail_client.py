@@ -66,16 +66,15 @@ def list_unread_ids(service, max_results: int = 10) -> list[str]:
     return [ref["id"] for ref in response.get("messages", [])]
 
 
-def get_email(service, message_id: str) -> IncomingEmail:
-    msg = service.users().messages().get(userId="me", id=message_id, format="raw").execute()
-    mime = BytesParser(policy=policy.default).parsebytes(base64.urlsafe_b64decode(msg["raw"]))
+def parse_email(raw: bytes, gmail_id: str, thread_id: str) -> IncomingEmail:
+    mime = BytesParser(policy=policy.default).parsebytes(raw)
 
     body_part = mime.get_body(preferencelist=("plain", "html"))
     sender = parseaddr(mime.get("From", ""))[1]
 
     return IncomingEmail(
-        id=msg["id"],
-        thread_id=msg["threadId"],
+        id=gmail_id,
+        thread_id=thread_id,
         message_id=mime.get("Message-ID", ""),
         sender=sender,
         reply_to=parseaddr(mime.get("Reply-To", ""))[1] or sender,
@@ -85,7 +84,12 @@ def get_email(service, message_id: str) -> IncomingEmail:
     )
 
 
-def send_reply(service, original: IncomingEmail, text: str) -> None:
+def get_email(service, message_id: str) -> IncomingEmail:
+    msg = service.users().messages().get(userId="me", id=message_id, format="raw").execute()
+    return parse_email(base64.urlsafe_b64decode(msg["raw"]), msg["id"], msg["threadId"])
+
+
+def build_reply(original: IncomingEmail, text: str) -> EmailMessage:
     reply = EmailMessage()
     reply["To"] = original.reply_to
     reply["Subject"] = (
@@ -99,8 +103,11 @@ def send_reply(service, original: IncomingEmail, text: str) -> None:
     # RFC 3834: tells other auto-responders not to reply to us (prevents bot loops).
     reply["Auto-Submitted"] = "auto-replied"
     reply.set_content(text)
+    return reply
 
-    raw = base64.urlsafe_b64encode(reply.as_bytes()).decode()
+
+def send_reply(service, original: IncomingEmail, text: str) -> None:
+    raw = base64.urlsafe_b64encode(build_reply(original, text).as_bytes()).decode()
     service.users().messages().send(
         userId="me", body={"raw": raw, "threadId": original.thread_id}
     ).execute()
