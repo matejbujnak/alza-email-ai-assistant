@@ -9,8 +9,8 @@ from app.gmail_client import IncomingEmail
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gemini-3.8-flash"
-DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_FALLBACK_MODEL = "gemini-3.8-flash"
 
 SYSTEM_INSTRUCTION = """\
 You are an AI customer support assistant for Alza, an electronics e-shop,
@@ -60,8 +60,8 @@ def build_prompt(email: IncomingEmail) -> str:
     # The sender's address is intentionally left out: the model doesn't need it
     # (our code addresses the reply), so we don't share it with the LLM provider.
     return (
-        f"<email_subject>{email.subject}</email_subject>\n"
-        f"<email_body>\n{email.body}\n</email_body>\n\n"
+        f"<email_subject>{email.subject.strip()}</email_subject>\n"
+        f"<email_body>\n{email.body.strip()}\n</email_body>\n\n"
         "Write a reply to this email in the language the customer wrote in."
     )
 

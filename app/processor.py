@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from app import gmail_client
 from app.filters import skip_reason
 from app.llm import generate_reply
+from app.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -35,5 +36,5 @@ def process_unread(service) -> None:
 
 if __name__ == "__main__":
     load_dotenv()
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    setup_logging()
     process_unread(gmail_client.get_gmail_service())
