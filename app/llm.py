@@ -9,8 +9,8 @@ from app.gmail_client import IncomingEmail
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gemini-3.8-flash"
-DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_FALLBACK_MODEL = "gemini-3.8-flash"
 
 SYSTEM_INSTRUCTION = """\
 You are an AI customer support assistant for Alza, an electronics e-shop,
