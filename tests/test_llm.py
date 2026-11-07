@@ -35,7 +35,8 @@ class FakeInteractions:
         result = self.responses[model]
         if isinstance(result, Exception):
             raise result
-        return SimpleNamespace(output_text=result, status="completed")
+        usage = SimpleNamespace(total_input_tokens=10, total_output_tokens=5)
+        return SimpleNamespace(output_text=result, status="completed", usage=usage)
 
 
 @pytest.fixture
@@ -75,3 +76,22 @@ def test_raises_when_all_models_fail(fake_gemini, make_email):
     fake_gemini({"primary": RuntimeError("down"), "fallback": RuntimeError("down")})
     with pytest.raises(RuntimeError, match="All Gemini models failed"):
         llm.generate_reply(make_email())
+
+
+def test_input_contains_prompt_and_attachment_blocks(make_email):
+    email = make_email(body="What's on the invoice?")
+    email.mime.add_attachment(b"%PDF-1.7", maintype="application", subtype="pdf", filename="invoice.pdf")
+    email.mime.add_attachment(b"PK", maintype="application", subtype="zip", filename="archive.zip")
+
+    blocks = llm.build_input(email)
+
+    assert blocks[0]["type"] == "text"
+    assert "<attachments>\n- invoice.pdf (application/pdf)\n</attachments>" in blocks[0]["text"]
+    assert "- archive.zip: unsupported file type (application/zip)" in blocks[0]["text"]
+    assert blocks[1] == {"type": "document", "data": "JVBERi0xLjc=", "mime_type": "application/pdf"}
+    assert len(blocks) == 2
+
+
+def test_prompt_has_no_attachment_sections_without_files(make_email):
+    prompt = llm.build_prompt(make_email())
+    assert "<attachments>" not in prompt and "<skipped_attachments>" not in prompt
