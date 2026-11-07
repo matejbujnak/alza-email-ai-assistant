@@ -60,8 +60,8 @@ def build_prompt(email: IncomingEmail) -> str:
     # The sender's address is intentionally left out: the model doesn't need it
     # (our code addresses the reply), so we don't share it with the LLM provider.
     return (
-        f"<email_subject>{email.subject}</email_subject>\n"
-        f"<email_body>\n{email.body}\n</email_body>\n\n"
+        f"<email_subject>{email.subject.strip()}</email_subject>\n"
+        f"<email_body>\n{email.body.strip()}\n</email_body>\n\n"
         "Write a reply to this email in the language the customer wrote in."
     )
 
