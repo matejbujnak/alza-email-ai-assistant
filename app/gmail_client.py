@@ -52,7 +52,7 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=get_credentials())
 
 
-def get_bot_address(service) -> str:
+def get_own_address(service) -> str:
     return service.users().getProfile(userId="me").execute()["emailAddress"]
 
 

@@ -10,10 +10,10 @@ from app.logging_config import setup_logging
 logger = logging.getLogger(__name__)
 
 
-def process_message(service, message_id: str, bot_address: str) -> None:
+def process_message(service, message_id: str, own_address: str) -> None:
     email = gmail_client.get_email(service, message_id)
 
-    if reason := skip_reason(email, bot_address):
+    if reason := skip_reason(email, own_address):
         logger.info("Skipping %s from %s: %s", email.id, email.sender, reason)
     else:
         reply = generate_reply(email)
@@ -24,11 +24,11 @@ def process_message(service, message_id: str, bot_address: str) -> None:
 
 
 def process_unread(service) -> None:
-    bot_address = gmail_client.get_bot_address(service)
+    own_address = gmail_client.get_own_address(service)
 
     for message_id in gmail_client.list_unread_ids(service):
         try:
-            process_message(service, message_id, bot_address)
+            process_message(service, message_id, own_address)
         except Exception:
             # Leave the email unread so it is retried on the next run.
             logger.exception("Failed to process %s", message_id)
