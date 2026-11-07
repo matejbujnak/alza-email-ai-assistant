@@ -24,3 +24,6 @@ venv/
 
 # --- Other ---
 task.pdf
+
+# --- Local runtime data ---
+logs/
