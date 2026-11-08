@@ -56,6 +56,8 @@ An auto-responder can be abused to send email to third parties (e.g. a forged `F
 
 ### Known limitations
 
+- **Only the newest message in a thread is used:** the quoted previous message below a reply (`> ...` lines with their "On ... wrote:" line) is removed, so it doesn't distort knowledge retrieval. The bot therefore doesn't see earlier messages; planned: pass the thread history to the model separately and retrieve knowledge for the new message only. Outlook-style quotes without `>` are not detected yet.
+
 - **No rate limiting yet:** a sender with a properly authenticated domain could still set `Reply-To` to a victim. Planned: per-recipient and global reply limits.
 - **Attachments over 14 MB are skipped:** Gmail allows up to 25 MB. Larger files could be sent via the Gemini Files API, which however keeps uploaded files for up to 48 hours.
 - **No output validation yet:** a prompt injection could make the model include arbitrary links. Planned: block links outside an allow-list of domains.
