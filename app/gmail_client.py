@@ -66,6 +66,27 @@ def list_unread_ids(service, max_results: int = 10) -> list[str]:
     return [ref["id"] for ref in response.get("messages", [])]
 
 
+def strip_quoted_reply(text: str) -> str:
+    """Remove the quoted previous message that mail clients append below a reply."""
+    lines = text.rstrip().splitlines()
+    start = len(lines)
+    while start > 0 and (lines[start - 1].startswith(">") or not lines[start - 1].strip()):
+        start -= 1
+    if not any(line.startswith(">") for line in lines[start:]):
+        return text
+
+    # The attribution line ("On ... wrote:") may be wrapped, so take its whole paragraph.
+    attribution = start
+    while attribution > 0 and lines[attribution - 1].strip():
+        attribution -= 1
+    paragraph = " ".join(lines[attribution:start])
+    if paragraph.endswith(":") and ("@" in paragraph or any(ch.isdigit() for ch in paragraph)):
+        start = attribution
+
+    # Interleaved replies keep their quotes; an email that is only a quote is kept whole.
+    return "\n".join(lines[:start]).rstrip() or text
+
+
 def parse_email(raw: bytes, gmail_id: str, thread_id: str) -> IncomingEmail:
     mime = BytesParser(policy=policy.default).parsebytes(raw)
 
@@ -79,7 +100,7 @@ def parse_email(raw: bytes, gmail_id: str, thread_id: str) -> IncomingEmail:
         sender=sender,
         reply_to=parseaddr(mime.get("Reply-To", ""))[1] or sender,
         subject=mime.get("Subject", ""),
-        body=body_part.get_content() if body_part else "",
+        body=strip_quoted_reply(body_part.get_content()) if body_part else "",
         mime=mime,
     )
 

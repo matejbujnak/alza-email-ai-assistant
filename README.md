@@ -2,6 +2,10 @@
 
 Proof of concept of an AI assistant that reads incoming emails and replies in the original thread using Gemini.
 
+## Knowledge base
+
+`knowledge/alzacare-plus/` contains the documents the assistant answers company-specific questions from. Each `##` section becomes one chunk, embedded with `gemini-embedding-2` into `knowledge/index.json`. After editing any document, rebuild the index with `uv run python -m app.rag build` (a test fails if the index is out of date). **AlzaCare+ is a fictional service created for this proof of concept**; its name, prices and terms are invented and do not describe any real Alza product or its actual terms.
+
 ## Development
 
 Requires [uv](https://docs.astral.sh/uv/).
@@ -51,6 +55,8 @@ An auto-responder can be abused to send email to third parties (e.g. a forged `F
 - **Data minimization:** the sender's address is not sent to the LLM; Gemini interactions are not stored (`store=False`).
 
 ### Known limitations
+
+- **Only the newest message in a thread is used:** the quoted previous message below a reply (`> ...` lines with their "On ... wrote:" line) is removed, so it doesn't distort knowledge retrieval. The bot therefore doesn't see earlier messages; planned: pass the thread history to the model separately and retrieve knowledge for the new message only. Outlook-style quotes without `>` are not detected yet.
 
 - **No rate limiting yet:** a sender with a properly authenticated domain could still set `Reply-To` to a victim. Planned: per-recipient and global reply limits.
 - **Attachments over 14 MB are skipped:** Gmail allows up to 25 MB. Larger files could be sent via the Gemini Files API, which however keeps uploaded files for up to 48 hours.

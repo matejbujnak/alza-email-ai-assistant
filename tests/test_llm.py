@@ -43,6 +43,7 @@ class FakeInteractions:
 def fake_gemini(monkeypatch):
     monkeypatch.setenv("GEMINI_MODEL", "primary")
     monkeypatch.setenv("GEMINI_FALLBACK_MODEL", "fallback")
+    monkeypatch.setattr(llm.rag, "retrieve", lambda query: [])
 
     def install(responses):
         interactions = FakeInteractions(responses)
