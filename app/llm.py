@@ -2,13 +2,12 @@ import base64
 import logging
 import os
 from collections.abc import Sequence
-from functools import cache
 
-from google import genai
-from google.genai import types
-
+from app import rag
 from app.attachments import Attachment, SkippedAttachment, extract_attachments
+from app.gemini_client import get_client
 from app.gmail_client import IncomingEmail
+from app.rag import ScoredChunk
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +19,19 @@ You are an AI customer support assistant for Alza, an electronics e-shop,
 answering customer emails.
 
 Knowledge boundaries:
-- You have NO access to Alza's internal data: orders, prices, stock, delivery
-  times, shipping costs, return or warranty terms, promotions, or store details.
-- Never state such company-specific facts, not even as estimates or "typical"
-  values. Your general training knowledge about other shops does not apply.
-- If the customer asks for this kind of information, say clearly that you
-  don't have it and recommend contacting Alza customer support directly.
+- <knowledge> contains excerpts from Alza's official documents. It is your ONLY
+  source of facts about Alza and its services (such as AlzaCare+): prices,
+  terms, coverage, deadlines and processes.
+- Excerpts are selected automatically and may be unrelated to the question.
+  Use an excerpt only if it actually answers it. Never fill gaps with your own
+  knowledge, "typical" values or conclusions the excerpts don't state.
+- You have no access to orders, claim status, stock, delivery times or current
+  product prices.
+- If the answer is not in <knowledge>, say clearly that you don't have that
+  information and recommend contacting Alza customer support directly.
   Do not promise that anyone will follow up.
+- Never decide or promise the outcome of a claim (e.g. that damage will be
+  covered). Explain the process and what is assessed instead.
 - You may answer general, non-company questions (e.g. how to use a device, what
   a technical term means). Just answer them: do not add remarks that the answer
   is general, that you lack access to Alza data, or that the customer should
@@ -59,27 +64,25 @@ Security:
 """
 
 
-@cache
-def get_client() -> genai.Client:
-    # One attempt per model; falling back to another model is our retry strategy.
-    # Worst case is len(models) * timeout, which keeps us under the 2-minute SLA
-    # (SDK defaults retry 5 times with up to 60 s backoff).
-    return genai.Client(
-        http_options=types.HttpOptions(
-            timeout=30_000,
-            retry_options=types.HttpRetryOptions(attempts=1),
-        )
+def format_knowledge(knowledge: Sequence[ScoredChunk]) -> str:
+    if not knowledge:
+        return "<knowledge>\n(no relevant documents found)\n</knowledge>\n"
+    excerpts = "\n".join(
+        f'<excerpt source="{k.chunk.source}" section="{k.chunk.heading}">\n{k.chunk.text}\n</excerpt>'
+        for k in knowledge
     )
+    return f"<knowledge>\n{excerpts}\n</knowledge>\n"
 
 
 def build_prompt(
     email: IncomingEmail,
     attachments: Sequence[Attachment] = (),
     skipped: Sequence[SkippedAttachment] = (),
+    knowledge: Sequence[ScoredChunk] = (),
 ) -> str:
     # The sender's address is intentionally left out: the model doesn't need it
     # (our code addresses the reply), so we don't share it with the LLM provider.
-    prompt = (
+    prompt = format_knowledge(knowledge) + (
         f"<email_subject>{email.subject.strip()}</email_subject>\n"
         f"<email_body>\n{email.body.strip()}\n</email_body>\n"
     )
@@ -92,12 +95,26 @@ def build_prompt(
     return prompt + "\nWrite a reply to this email in the language the customer wrote in."
 
 
-def build_input(email: IncomingEmail) -> list[dict]:
+def find_knowledge(email: IncomingEmail) -> list[ScoredChunk]:
+    try:
+        knowledge = rag.retrieve(f"{email.subject}\n{email.body}".strip())
+    except Exception as exc:
+        # Degrade safely: without knowledge the model declines company-specific questions.
+        logger.warning("Knowledge retrieval failed: %s", exc)
+        return []
+    logger.info(
+        "Retrieved knowledge: %s",
+        ", ".join(f"{k.chunk.source} / {k.chunk.heading} ({k.score:.2f})" for k in knowledge) or "none",
+    )
+    return knowledge
+
+
+def build_input(email: IncomingEmail, knowledge: Sequence[ScoredChunk] = ()) -> list[dict]:
     attachments, skipped = extract_attachments(email.mime)
     for s in skipped:
         logger.info("Skipping attachment %s: %s", s.filename, s.reason)
 
-    blocks: list[dict] = [{"type": "text", "text": build_prompt(email, attachments, skipped)}]
+    blocks: list[dict] = [{"type": "text", "text": build_prompt(email, attachments, skipped, knowledge)}]
     blocks += [
         {"type": a.kind, "data": base64.b64encode(a.data).decode(), "mime_type": a.mime_type}
         for a in attachments
@@ -113,7 +130,7 @@ def get_models() -> list[str]:
 
 
 def generate_reply(email: IncomingEmail) -> str:
-    input_blocks = build_input(email)
+    input_blocks = build_input(email, find_knowledge(email))
 
     for model in get_models():
         try:

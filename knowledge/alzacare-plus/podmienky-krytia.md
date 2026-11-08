@@ -1,4 +1,4 @@
-# AlzaCare+ – podmienky krytia
+# AlzaCare+ - podmienky krytia
 
 ## Čo kryje variant Štandard
 

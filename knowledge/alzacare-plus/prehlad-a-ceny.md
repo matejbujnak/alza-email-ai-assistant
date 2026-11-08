@@ -1,4 +1,4 @@
-# AlzaCare+ – prehľad služby a ceny
+# AlzaCare+ - prehľad služby a ceny
 
 ## Čo je AlzaCare+
 
@@ -9,7 +9,7 @@ AlzaCare+ je doplnková servisná služba k elektronike zakúpenej na Alze. Exis
 
 ## Pre aké zariadenia je AlzaCare+ dostupné
 
-AlzaCare+ je možné dokúpiť k týmto kategóriám: mobilné telefóny, tablety, notebooky, inteligentné hodinky, televízory, herné konzoly a fotoaparáty.
+AlzaCare+ je možné dokúpiť k týmto kategóriám: mobilné telefóny, tablety, notebooky, inteligentné hodinky, televízory, herné konzoly, fotoaparáty a drony.
 
 AlzaCare+ nie je dostupné pre príslušenstvo (káble, nabíjačky, puzdrá), spotrebný materiál, repasované a rozbalené produkty. Variant Premium nie je dostupný pre drony.
 
@@ -20,18 +20,18 @@ AlzaCare+ je možné dokúpiť iba k zariadeniu s kúpnou cenou do 3 000 €. Pr
 Cena je jednorazová a závisí od kúpnej ceny zariadenia:
 
 | Kúpna cena zariadenia | Štandard | Premium |
-|---|---|---|
-| do 300 € | 29 € | 49 € |
-| 300,01 – 800 € | 59 € | 99 € |
-| 800,01 – 1 500 € | 99 € | 159 € |
-| 1 500,01 – 3 000 € | 149 € | 239 € |
+| --------------------- | -------- | ------- |
+| do 300 €              | 29 €     | 49 €    |
+| 300,01 - 800 €        | 59 €     | 99 €    |
+| 800,01 - 1 500 €      | 99 €     | 159 €   |
+| 1 500,01 - 3 000 €    | 149 €    | 239 €   |
 
 Cena platí na celé obdobie služby, neplatí sa mesačne.
 
 ## Ako si AlzaCare+ kúpiť
 
-- **Spolu so zariadením** – v košíku pri produkte zvoľte variant AlzaCare+.
-- **Dodatočne** – variant Štandard je možné dokúpiť do 30 dní od kúpy zariadenia. Variant Premium je možné dokúpiť iba do 14 dní od kúpy a len k nepoškodenému zariadeniu.
+- **Spolu so zariadením** - v košíku pri produkte zvoľte variant AlzaCare+.
+- **Dodatočne** - variant Štandard je možné dokúpiť do 30 dní od kúpy zariadenia. Variant Premium je možné dokúpiť iba do 14 dní od kúpy a len k nepoškodenému zariadeniu.
 
 AlzaCare+ sa viaže na konkrétne zariadenie (podľa sériového čísla), nie na zákazníka.
 

@@ -4,7 +4,7 @@ Proof of concept of an AI assistant that reads incoming emails and replies in th
 
 ## Knowledge base
 
-`knowledge/alzacare-plus/` contains the documents the assistant answers company-specific questions from. **AlzaCare+ is a fictional service created for this proof of concept**; its name, prices and terms are invented and do not describe any real Alza product or its actual terms.
+`knowledge/alzacare-plus/` contains the documents the assistant answers company-specific questions from. Each `##` section becomes one chunk, embedded with `gemini-embedding-2` into `knowledge/index.json`. After editing any document, rebuild the index with `uv run python -m app.rag build` (a test fails if the index is out of date). **AlzaCare+ is a fictional service created for this proof of concept**; its name, prices and terms are invented and do not describe any real Alza product or its actual terms.
 
 ## Development
 

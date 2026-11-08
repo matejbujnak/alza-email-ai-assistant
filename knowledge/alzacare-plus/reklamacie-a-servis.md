@@ -1,4 +1,4 @@
-# AlzaCare+ – reklamácie a servis
+# AlzaCare+ - reklamácie a servis
 
 ## Ako nahlásiť poškodenie alebo poruchu
 
@@ -8,14 +8,14 @@ K reklamácii pripravte:
 
 - číslo objednávky alebo sériové číslo zariadenia,
 - popis poruchy alebo udalosti (kedy a ako vznikla),
-- pri náhodnom poškodení aj fotografie poškodenia – sú povinné,
+- pri náhodnom poškodení aj fotografie poškodenia - sú povinné,
 - pri poliatí tekutinou uveďte, o akú tekutinu išlo.
 
 ## Odovzdanie zariadenia do servisu
 
 - **Bezplatný zvoz kuriérom** z adresy na Slovensku alebo v Česku. Kuriér prinesie aj obal, zariadenie stačí pripraviť bez príslušenstva.
-- **Odovzdanie v AlzaBoxe** – po podaní reklamácie dostanete kód na odoslanie.
-- **Osobne na predajni Alza** – na počkanie sa vystaví reklamačný protokol.
+- **Odovzdanie v AlzaBoxe** - po podaní reklamácie dostanete kód na odoslanie.
+- **Osobne na predajni Alza** - na počkanie sa vystaví reklamačný protokol.
 
 Pred odovzdaním zariadenia si zálohujte dáta a vypnite funkcie ako „Nájsť môj iPhone“ alebo „Nájsť zariadenie“. Bez ich vypnutia nemôže servis zariadenie opraviť a lehota sa predlžuje.
 
@@ -23,9 +23,9 @@ Pred odovzdaním zariadenia si zálohujte dáta a vypnite funkcie ako „Nájsť
 
 O uznaní reklamácie rozhoduje autorizovaný servisný technik. Posudzuje najmä:
 
-- **zhodu popisu s poškodením** – charakter poškodenia musí zodpovedať popísanej udalosti (napríklad pri páde sú typické stopy nárazu v mieste dopadu, pri poliatí indikátory vlhkosti vo vnútri zariadenia),
+- **zhodu popisu s poškodením** - charakter poškodenia musí zodpovedať popísanej udalosti (napríklad pri páde sú typické stopy nárazu v mieste dopadu, pri poliatí indikátory vlhkosti vo vnútri zariadenia),
 - **fotografie** priložené k reklamácii a ich zhodu so stavom zariadenia pri prevzatí,
-- **známky úmyslu alebo neodborného zásahu** – opakované údery, poškodenie nástrojom, otvorené alebo upravené zariadenie.
+- **známky úmyslu alebo neodborného zásahu** - opakované údery, poškodenie nástrojom, otvorené alebo upravené zariadenie.
 
 Pri podaní reklamácie zákazník potvrdzuje čestné vyhlásenie, že poškodenie nespôsobil úmyselne. Servis môže požiadať o doplňujúce informácie. Ak popis nezodpovedá poškodeniu, reklamácia sa zamietne s písomným zdôvodnením.
 
