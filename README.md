@@ -2,6 +2,77 @@
 
 Proof of concept of an AI assistant that reads incoming emails and replies in the original thread using Gemini.
 
+## How it works
+
+### In plain words
+
+```mermaid
+flowchart LR
+    A["📧 Customer sends an email<br/>text, PDF, photo, voice message"] --> B{"Is it a real customer?<br/>not spam, not automated,<br/>sender verified"}
+    B -- no --> X["Ignored"]
+    B -- yes --> C["Reads the email<br/>and its attachments"]
+    C --> D["Looks up the answer in<br/>Alza's official documents"]
+    D --> E["AI writes a reply<br/>in the customer's language"]
+    E --> F["✅ Reply in the same<br/>email thread, ~20 s"]
+```
+
+The assistant answers company questions only from Alza's documents. If the answer isn't there, it says so and recommends customer support instead of guessing, and it never promises the outcome of a claim.
+
+### System architecture
+
+```mermaid
+flowchart LR
+    customer(["Customer"]) -- email --> gmail["Gmail inbox<br/>matej.alza.bot@gmail.com"]
+    gmail -- "inbox changed" --> topic["Pub/Sub topic<br/>gmail-notifications"]
+    topic -- "push subscription<br/>(authenticated POST)" --> run
+
+    subgraph gcp ["Google Cloud project (europe-west1)"]
+        topic
+        scheduler["Cloud Scheduler"] -- "every 5 min: /pubsub<br/>daily: /renew-watch" --> run
+        run["Cloud Run service<br/>FastAPI, private"]
+        run <-->|"claim each email once"| firestore[("Firestore<br/>processed_emails, TTL 30 days")]
+        secrets["Secret Manager<br/>Gmail token, Gemini key"] -. "mounted at start" .-> run
+        run -- "JSON logs" --> logging["Cloud Logging"]
+    end
+
+    run <-->|"read email, send reply,<br/>mark as read"| gmailapi["Gmail API"]
+    run <-->|"embed question,<br/>generate reply"| gemini["Gemini API<br/>gemini-embedding-2, gemini-3.5-flash-lite"]
+    index[("Knowledge index<br/>AlzaCare+ documents, in the image")] -. "top 4 sections" .-> run
+```
+
+### Processing one email
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant G as Gmail
+    participant P as Pub/Sub
+    participant R as Cloud Run
+    participant F as Firestore
+    participant AI as Gemini
+
+    G->>P: inbox changed
+    P->>R: POST /pubsub
+    R->>G: list unread emails (last 7 days)
+    loop each unread email
+        R->>F: claim email (transaction)
+        alt already handled or in progress
+            F-->>R: skip
+        else acquired
+            R->>G: fetch email and attachments
+            R->>R: strip quoted history, check sender and filters
+            R->>AI: embed question
+            R->>R: pick top 4 knowledge sections
+            R->>AI: prompt + knowledge + attachments
+            AI-->>R: reply text
+            R->>G: send reply in the thread
+            R->>F: mark done
+            R->>G: mark as read
+        end
+    end
+    R-->>P: 204 (or 500, so Pub/Sub retries)
+```
+
 ## Knowledge base
 
 `knowledge/alzacare-plus/` contains the documents the assistant answers company-specific questions from. Each `##` section becomes one chunk, embedded with `gemini-embedding-2` into `knowledge/index.json`. After editing any document, rebuild the index with `uv run python -m app.rag build` (a test fails if the index is out of date). **AlzaCare+ is a fictional service created for this proof of concept**; its name, prices and terms are invented and do not describe any real Alza product or its actual terms.
