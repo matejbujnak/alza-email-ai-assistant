@@ -1,0 +1,15 @@
+# Secrets must never end up in the image; Cloud Run gets them from Secret Manager.
+.env
+.env.*
+credentials.json
+client_secret*.json
+token.json
+*service-account*.json
+secrets/
+
+.git/
+.venv/
+__pycache__/
+logs/
+tests/
+task.pdf
