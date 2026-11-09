@@ -19,6 +19,7 @@ cp .env.example .env         # then fill in your values
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `uv run python -m app.processor`                                | Process unread emails in the bot inbox and reply                               |
 | `uv run python -m app.try_reply --body "..." [--subject "..."] [--attach file]` | Print the bot's reply to a hand-written email; nothing is sent; `--attach` is repeatable |
+| `uv run uvicorn app.main:app --reload`                          | Run the web service used on Cloud Run (`POST /pubsub`, `POST /renew-watch`)    |
 | `uv run pytest`                                                 | Fast offline tests (no Gmail, no Gemini)                                       |
 | `uv run pytest -m live -s`                                      | Behavioural tests against the real Gemini API; prints replies for human review |
 
@@ -30,8 +31,28 @@ cp .env.example .env         # then fill in your values
 | `GEMINI_MODEL`          | Primary model (default `gemini-3.5-flash-lite`)                |
 | `GEMINI_FALLBACK_MODEL` | Used when the primary model fails (default `gemini-3.8-flash`) |
 | `LOG_FILE`              | Optional path for a rotating log file, e.g. `logs/app.log`     |
+| `GMAIL_TOKEN_FILE`      | Path to the Gmail OAuth token (default `token.json`)           |
+| `PUBSUB_TOPIC`          | Pub/Sub topic for Gmail notifications, `projects/<project>/topics/<topic>` |
 
-Gmail access uses OAuth: put the OAuth client file at `credentials.json`; the first run opens a browser and stores the token in `token.json`. Both files are git-ignored.
+The processor records handled emails in Firestore, so running it locally also needs Google Cloud credentials: `gcloud auth application-default login`. `try_reply` and the tests don't use Firestore.
+
+Gmail access uses OAuth: put the OAuth client file at `credentials.json` and run `uv run python -m app.gmail_client login`, which opens a browser and stores the token in `token.json`. Both files are git-ignored. The token contains the client ID and secret, so `credentials.json` is only needed for logging in.
+
+## Deployment (Google Cloud)
+
+Gmail publishes inbox changes to a Pub/Sub topic, whose push subscription calls the private Cloud Run service (`POST /pubsub`). The service processes all unread emails from the last 7 days. Cloud Scheduler renews the Gmail watch daily (it expires after 7 days) and calls `/pubsub` every 5 minutes as a fallback for missed notifications.
+
+- `scripts/setup.sh`: one-time setup of a new project (APIs, Firestore, secrets, service accounts, Cloud Run, Pub/Sub, Scheduler). Prerequisites are listed at the top of the script.
+- `scripts/deploy.sh`: build and deploy a new revision after a code change.
+- Settings (project, region, names) are in `scripts/config.sh`.
+
+| Service account | Used by | Permissions |
+| --- | --- | --- |
+| `alza-bot` | the running service | read the two secrets, read/write Firestore |
+| `alza-bot-invoker` | Pub/Sub push, Cloud Scheduler | invoke the Cloud Run service |
+| `alza-bot-builder` | Cloud Build | build and store the container image |
+
+The Gmail token and Gemini API key are stored in Secret Manager; the token is mounted as a file, the key as an environment variable.
 
 ## Attachments
 
@@ -51,6 +72,7 @@ An auto-responder can be abused to send email to third parties (e.g. a forged `F
 - **Sender authentication:** emails that fail Gmail's DMARC check, or pass neither SPF nor DKIM, are skipped. Only Gmail's own (topmost) `Authentication-Results` header is trusted.
 - **No replies to automated senders:** own address, no-reply addresses (checked on the address the reply would go to), `Auto-Submitted`, bulk `Precedence` and mailing lists.
 - **Loop prevention:** replies carry `Auto-Submitted: auto-replied` (RFC 3834).
+- **Exactly one reply per email:** before processing, an instance claims the email in Firestore in a transaction, so concurrent instances or duplicate notifications don't answer twice. A claim abandoned by a crashed instance expires after 5 minutes; records are deleted after 30 days by a Firestore TTL policy. Only emails from the last 7 days are processed, so an old email marked unread again after its record expired is not answered twice.
 - **Prompt-injection guard:** email subject and body are passed to the model as delimited, untrusted input.
 - **Data minimization:** the sender's address is not sent to the LLM; Gemini interactions are not stored (`store=False`).
 

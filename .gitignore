@@ -27,3 +27,6 @@ task.pdf
 
 # --- Local runtime data ---
 logs/
+
+# --- Personal notes ---
+notes/
