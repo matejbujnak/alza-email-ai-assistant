@@ -59,7 +59,8 @@ def get_credentials() -> Credentials:
 
 
 def get_gmail_service():
-    return build("gmail", "v1", credentials=get_credentials())
+    # The discovery cache only works with the long-deprecated oauth2client and just logs a warning.
+    return build("gmail", "v1", credentials=get_credentials(), cache_discovery=False)
 
 
 def get_own_address(service) -> str:
