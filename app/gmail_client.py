@@ -66,13 +66,9 @@ def get_own_address(service) -> str:
     return service.users().getProfile(userId="me").execute()["emailAddress"]
 
 
-def list_unread_ids(service, max_results: int = 10) -> list[str]:
-    response = (
-        service.users()
-        .messages()
-        .list(userId="me", q="is:unread in:inbox", maxResults=max_results)
-        .execute()
-    )
+def list_unread_ids(service, newer_than_days: int, max_results: int = 10) -> list[str]:
+    query = f"is:unread in:inbox newer_than:{newer_than_days}d"
+    response = service.users().messages().list(userId="me", q=query, maxResults=max_results).execute()
     return [ref["id"] for ref in response.get("messages", [])]
 
 

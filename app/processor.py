@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from dotenv import load_dotenv
 
@@ -9,6 +10,10 @@ from app.llm import generate_reply
 from app.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
+
+# Older emails are ignored. Must stay below claims.RETENTION: once a record expires, an old email
+# marked unread again would otherwise be answered a second time.
+MAX_EMAIL_AGE = timedelta(days=7)
 
 
 def process_message(service, message_id: str, own_address: str) -> None:
@@ -44,7 +49,7 @@ def process_message(service, message_id: str, own_address: str) -> None:
 def process_unread(service) -> None:
     own_address = gmail_client.get_own_address(service)
 
-    for message_id in gmail_client.list_unread_ids(service):
+    for message_id in gmail_client.list_unread_ids(service, newer_than_days=MAX_EMAIL_AGE.days):
         try:
             process_message(service, message_id, own_address)
         except Exception:

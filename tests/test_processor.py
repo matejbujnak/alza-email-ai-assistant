@@ -57,3 +57,7 @@ def test_skipped_email_is_recorded_and_read(world):
     events, _ = world
     processor.process_message(None, "m1", "jane@example.com")
     assert events == ["done", "read"]
+
+
+def test_emails_are_ignored_before_their_claim_record_expires():
+    assert processor.MAX_EMAIL_AGE < processor.claims.RETENTION

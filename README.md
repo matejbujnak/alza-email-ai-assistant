@@ -54,7 +54,7 @@ An auto-responder can be abused to send email to third parties (e.g. a forged `F
 - **Sender authentication:** emails that fail Gmail's DMARC check, or pass neither SPF nor DKIM, are skipped. Only Gmail's own (topmost) `Authentication-Results` header is trusted.
 - **No replies to automated senders:** own address, no-reply addresses (checked on the address the reply would go to), `Auto-Submitted`, bulk `Precedence` and mailing lists.
 - **Loop prevention:** replies carry `Auto-Submitted: auto-replied` (RFC 3834).
-- **Exactly one reply per email:** before processing, an instance claims the email in Firestore in a transaction, so concurrent instances or duplicate notifications don't answer twice. A claim abandoned by a crashed instance expires after 5 minutes; records are deleted after 30 days by a Firestore TTL policy.
+- **Exactly one reply per email:** before processing, an instance claims the email in Firestore in a transaction, so concurrent instances or duplicate notifications don't answer twice. A claim abandoned by a crashed instance expires after 5 minutes; records are deleted after 30 days by a Firestore TTL policy. Only emails from the last 7 days are processed, so an old email marked unread again after its record expired is not answered twice.
 - **Prompt-injection guard:** email subject and body are passed to the model as delimited, untrusted input.
 - **Data minimization:** the sender's address is not sent to the LLM; Gemini interactions are not stored (`store=False`).
 
