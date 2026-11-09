@@ -115,3 +115,28 @@ def test_split_questions_falls_back_to_whole_email(monkeypatch, make_email):
 
     monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(interactions=SimpleNamespace(create=failing_create)))
     assert llm.split_questions(make_email(body="Ahoj", subject="Otázka")) == ["Otázka\nAhoj"]
+
+
+FOLLOW_UP = "A druhá najlepšia vec?\n________________________________\nFrom: Bot <bot@example.com>\nSent: 9 November 2026\n\nNajlepšie je krytie pádu."
+
+
+def test_quoted_message_is_context_before_the_new_email(make_email):
+    prompt = llm.build_prompt(make_email(body=FOLLOW_UP))
+
+    assert "From: Bot <bot@example.com>" in prompt and "Najlepšie je krytie pádu." in prompt
+    assert prompt.index("</previous_message>") < prompt.index("<email_body>\nA druhá najlepšia vec?\n</email_body>")
+
+
+def test_prompt_has_no_previous_message_without_quote(make_email):
+    assert "<previous_message>" not in llm.build_prompt(make_email(body="Ahoj"))
+
+
+def test_split_questions_sees_the_quoted_message(monkeypatch, make_email):
+    calls = []
+    reply = SimpleNamespace(output_text='{"questions": ["Aká je druhá najlepšia vlastnosť AlzaCare+?"]}')
+    interactions = SimpleNamespace(create=lambda **kwargs: calls.append(kwargs) or reply)
+    monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(interactions=interactions))
+
+    llm.split_questions(make_email(body=FOLLOW_UP))
+
+    assert "Najlepšie je krytie pádu." in calls[0]["input"]

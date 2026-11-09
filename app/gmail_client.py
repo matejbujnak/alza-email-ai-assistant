@@ -1,4 +1,5 @@
 import base64
+import re
 import os
 import sys
 from dataclasses import dataclass
@@ -31,6 +32,8 @@ class IncomingEmail:
     reply_to: str
     subject: str
     body: str
+    # The earlier message quoted below the reply, used only as context.
+    quoted: str
     mime: EmailMessage
 
 
@@ -79,31 +82,58 @@ def list_unread_ids(service, newer_than_days: int, max_results: int = 10) -> lis
     return [ref["id"] for ref in response.get("messages", [])]
 
 
-def strip_quoted_reply(text: str) -> str:
-    """Remove the quoted previous message that mail clients append below a reply."""
-    lines = text.rstrip().splitlines()
+# Outlook doesn't prefix quoted lines with ">"; it inserts a separator or a header block instead.
+OUTLOOK_SEPARATOR = re.compile(r"^_{10,}$|^-{2,}\s*(original message|původní zpráva|pôvodná správa)\s*-{2,}$", re.IGNORECASE)
+QUOTE_FROM = re.compile(r"^(from|od):\s", re.IGNORECASE)
+QUOTE_DATE = re.compile(r"^(sent|date|datum|dátum|odesláno|odoslané):\s", re.IGNORECASE)
+
+
+def _outlook_quote_start(lines: list[str]) -> int | None:
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if OUTLOOK_SEPARATOR.match(stripped):
+            return i
+        if QUOTE_FROM.match(stripped) and any(QUOTE_DATE.match(next_line.strip()) for next_line in lines[i + 1 : i + 4]):
+            return i
+    return None
+
+
+def _gmail_quote_start(lines: list[str]) -> int | None:
     start = len(lines)
     while start > 0 and (lines[start - 1].startswith(">") or not lines[start - 1].strip()):
         start -= 1
     if not any(line.startswith(">") for line in lines[start:]):
-        return text
-
+        return None
     # The attribution line ("On ... wrote:") may be wrapped, so take its whole paragraph.
     attribution = start
     while attribution > 0 and lines[attribution - 1].strip():
         attribution -= 1
     paragraph = " ".join(lines[attribution:start])
     if paragraph.endswith(":") and ("@" in paragraph or any(ch.isdigit() for ch in paragraph)):
-        start = attribution
+        return attribution
+    return start
 
-    # Interleaved replies keep their quotes; an email that is only a quote is kept whole.
-    return "\n".join(lines[:start]).rstrip() or text
+
+def split_quoted_reply(text: str) -> tuple[str, str]:
+    """Split a reply into the new text and the quoted earlier message that mail clients append."""
+    lines = text.rstrip().splitlines()
+    start = _outlook_quote_start(lines)
+    if start is None:
+        # Gmail quotes at the end; interleaved replies keep their quotes.
+        start = _gmail_quote_start(lines)
+    new_text = "\n".join(lines[:start]).rstrip() if start is not None else ""
+    if not new_text:
+        # No quote, or an email that is only a quote: keep it whole.
+        return text, ""
+    quoted = "\n".join(line.removeprefix(">").removeprefix(" ") if line.startswith(">") else line for line in lines[start:])
+    return new_text, quoted.strip()
 
 
 def parse_email(raw: bytes, gmail_id: str, thread_id: str) -> IncomingEmail:
     mime = BytesParser(policy=policy.default).parsebytes(raw)
 
     body_part = mime.get_body(preferencelist=("plain", "html"))
+    body, quoted = split_quoted_reply(body_part.get_content()) if body_part else ("", "")
     sender = parseaddr(mime.get("From", ""))[1]
 
     return IncomingEmail(
@@ -113,7 +143,8 @@ def parse_email(raw: bytes, gmail_id: str, thread_id: str) -> IncomingEmail:
         sender=sender,
         reply_to=parseaddr(mime.get("Reply-To", ""))[1] or sender,
         subject=mime.get("Subject", ""),
-        body=strip_quoted_reply(body_part.get_content()) if body_part else "",
+        body=body,
+        quoted=quoted,
         mime=mime,
     )
 
