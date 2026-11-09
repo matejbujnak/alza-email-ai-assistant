@@ -32,6 +32,8 @@ cp .env.example .env         # then fill in your values
 | `LOG_FILE`              | Optional path for a rotating log file, e.g. `logs/app.log`     |
 | `GMAIL_TOKEN_FILE`      | Path to the Gmail OAuth token (default `token.json`)           |
 
+The processor records handled emails in Firestore, so running it locally also needs Google Cloud credentials: `gcloud auth application-default login`. `try_reply` and the tests don't use Firestore.
+
 Gmail access uses OAuth: put the OAuth client file at `credentials.json` and run `uv run python -m app.gmail_client login`, which opens a browser and stores the token in `token.json`. Both files are git-ignored. The token contains the client ID and secret, so `credentials.json` is only needed for logging in.
 
 ## Attachments
@@ -52,6 +54,7 @@ An auto-responder can be abused to send email to third parties (e.g. a forged `F
 - **Sender authentication:** emails that fail Gmail's DMARC check, or pass neither SPF nor DKIM, are skipped. Only Gmail's own (topmost) `Authentication-Results` header is trusted.
 - **No replies to automated senders:** own address, no-reply addresses (checked on the address the reply would go to), `Auto-Submitted`, bulk `Precedence` and mailing lists.
 - **Loop prevention:** replies carry `Auto-Submitted: auto-replied` (RFC 3834).
+- **Exactly one reply per email:** before processing, an instance claims the email in Firestore in a transaction, so concurrent instances or duplicate notifications don't answer twice. A claim abandoned by a crashed instance expires after 5 minutes; records are deleted after 30 days by a Firestore TTL policy.
 - **Prompt-injection guard:** email subject and body are passed to the model as delimited, untrusted input.
 - **Data minimization:** the sender's address is not sent to the LLM; Gemini interactions are not stored (`store=False`).
 
