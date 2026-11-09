@@ -25,4 +25,5 @@ COPY knowledge/ knowledge/
 RUN useradd --system --no-create-home bot
 USER bot
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Cloud Run already logs every request, so uvicorn's access log would only duplicate it.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
