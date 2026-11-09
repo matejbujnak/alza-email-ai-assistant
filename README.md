@@ -19,6 +19,7 @@ cp .env.example .env         # then fill in your values
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `uv run python -m app.processor`                                | Process unread emails in the bot inbox and reply                               |
 | `uv run python -m app.try_reply --body "..." [--subject "..."] [--attach file]` | Print the bot's reply to a hand-written email; nothing is sent; `--attach` is repeatable |
+| `uv run uvicorn app.main:app --reload`                          | Run the web service used on Cloud Run (`POST /pubsub`, `POST /renew-watch`)    |
 | `uv run pytest`                                                 | Fast offline tests (no Gmail, no Gemini)                                       |
 | `uv run pytest -m live -s`                                      | Behavioural tests against the real Gemini API; prints replies for human review |
 
@@ -31,6 +32,7 @@ cp .env.example .env         # then fill in your values
 | `GEMINI_FALLBACK_MODEL` | Used when the primary model fails (default `gemini-3.8-flash`) |
 | `LOG_FILE`              | Optional path for a rotating log file, e.g. `logs/app.log`     |
 | `GMAIL_TOKEN_FILE`      | Path to the Gmail OAuth token (default `token.json`)           |
+| `PUBSUB_TOPIC`          | Pub/Sub topic for Gmail notifications, `projects/<project>/topics/<topic>` |
 
 The processor records handled emails in Firestore, so running it locally also needs Google Cloud credentials: `gcloud auth application-default login`. `try_reply` and the tests don't use Firestore.
 

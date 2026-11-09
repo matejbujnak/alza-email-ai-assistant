@@ -46,8 +46,10 @@ def process_message(service, message_id: str, own_address: str) -> None:
     gmail_client.mark_as_read(service, message_id)
 
 
-def process_unread(service) -> None:
+def process_unread(service) -> int:
+    """Process unread emails and return how many failed."""
     own_address = gmail_client.get_own_address(service)
+    failed = 0
 
     for message_id in gmail_client.list_unread_ids(service, newer_than_days=MAX_EMAIL_AGE.days):
         try:
@@ -55,6 +57,8 @@ def process_unread(service) -> None:
         except Exception:
             # Leave the email unread so it is retried on the next run.
             logger.exception("Failed to process %s", message_id)
+            failed += 1
+    return failed
 
 
 if __name__ == "__main__":
