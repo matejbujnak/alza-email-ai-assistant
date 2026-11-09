@@ -30,8 +30,9 @@ cp .env.example .env         # then fill in your values
 | `GEMINI_MODEL`          | Primary model (default `gemini-3.5-flash-lite`)                |
 | `GEMINI_FALLBACK_MODEL` | Used when the primary model fails (default `gemini-3.8-flash`) |
 | `LOG_FILE`              | Optional path for a rotating log file, e.g. `logs/app.log`     |
+| `GMAIL_TOKEN_FILE`      | Path to the Gmail OAuth token (default `token.json`)           |
 
-Gmail access uses OAuth: put the OAuth client file at `credentials.json`; the first run opens a browser and stores the token in `token.json`. Both files are git-ignored.
+Gmail access uses OAuth: put the OAuth client file at `credentials.json` and run `uv run python -m app.gmail_client login`, which opens a browser and stores the token in `token.json`. Both files are git-ignored. The token contains the client ID and secret, so `credentials.json` is only needed for logging in.
 
 ## Attachments
 

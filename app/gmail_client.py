@@ -1,4 +1,6 @@
 import base64
+import os
+import sys
 from dataclasses import dataclass
 from email import policy
 from email.message import EmailMessage
@@ -17,7 +19,7 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CREDENTIALS_FILE = PROJECT_ROOT / "credentials.json"
-TOKEN_FILE = PROJECT_ROOT / "token.json"
+LOGIN_HINT = "run: uv run python -m app.gmail_client login"
 
 
 @dataclass(frozen=True)
@@ -32,19 +34,27 @@ class IncomingEmail:
     mime: EmailMessage
 
 
-def get_credentials() -> Credentials:
-    if TOKEN_FILE.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
-        try:
-            # Fail fast on a revoked/expired refresh token instead of on the first API call.
-            creds.refresh(Request())
-            return creds
-        except RefreshError:
-            pass
+def token_file() -> Path:
+    # Read at call time, so GMAIL_TOKEN_FILE from .env or Cloud Run is picked up.
+    return Path(os.getenv("GMAIL_TOKEN_FILE", PROJECT_ROOT / "token.json"))
 
+
+def login() -> None:
     flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_FILE), SCOPES)
     creds = flow.run_local_server(port=0)
-    TOKEN_FILE.write_text(creds.to_json())
+    token_file().write_text(creds.to_json())
+
+
+def get_credentials() -> Credentials:
+    path = token_file()
+    if not path.exists():
+        raise RuntimeError(f"Gmail token not found at {path}, {LOGIN_HINT}")
+    creds = Credentials.from_authorized_user_file(str(path), SCOPES)
+    try:
+        # Fail fast on a revoked/expired refresh token instead of on the first API call.
+        creds.refresh(Request())
+    except RefreshError as exc:
+        raise RuntimeError(f"Gmail token is expired or revoked, {LOGIN_HINT}") from exc
     return creds
 
 
@@ -138,3 +148,13 @@ def mark_as_read(service, message_id: str) -> None:
     service.users().messages().modify(
         userId="me", id=message_id, body={"removeLabelIds": ["UNREAD"]}
     ).execute()
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    if sys.argv[1:] == ["login"]:
+        login()
+    else:
+        sys.exit("Usage: uv run python -m app.gmail_client login")

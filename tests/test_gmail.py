@@ -1,6 +1,6 @@
 import pytest
 
-from app.gmail_client import build_reply, strip_quoted_reply
+from app.gmail_client import build_reply, get_credentials, strip_quoted_reply
 
 
 def test_parse_email_extracts_fields(make_email):
@@ -78,3 +78,9 @@ def test_strip_quoted_reply(text, expected):
 
 def test_parsed_body_excludes_quoted_reply(make_email):
     assert make_email(body=GMAIL_REPLY).body == "Ako posudzujete náhodné poškodenie?"
+
+
+def test_missing_token_explains_how_to_log_in(monkeypatch, tmp_path):
+    monkeypatch.setenv("GMAIL_TOKEN_FILE", str(tmp_path / "missing.json"))
+    with pytest.raises(RuntimeError, match="app.gmail_client login"):
+        get_credentials()
