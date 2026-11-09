@@ -2,6 +2,8 @@
 
 Proof of concept of an AI assistant that reads incoming emails and replies in the original thread using Gemini.
 
+**Try it:** send an email to **matej.alza.bot@gmail.com**, for example "How much is AlzaCare+ Premium for a 1200 EUR laptop?" or "My phone was stolen, is it covered?". Attachments (PDF, photos, voice messages) work too. The reply arrives in the same thread in about 20 seconds. AlzaCare+ is a fictional service, see [Knowledge base](#knowledge-base).
+
 ## How it works
 
 ### In plain words
