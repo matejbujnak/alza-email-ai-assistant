@@ -38,6 +38,22 @@ The processor records handled emails in Firestore, so running it locally also ne
 
 Gmail access uses OAuth: put the OAuth client file at `credentials.json` and run `uv run python -m app.gmail_client login`, which opens a browser and stores the token in `token.json`. Both files are git-ignored. The token contains the client ID and secret, so `credentials.json` is only needed for logging in.
 
+## Deployment (Google Cloud)
+
+Gmail publishes inbox changes to a Pub/Sub topic, whose push subscription calls the private Cloud Run service (`POST /pubsub`). The service processes all unread emails from the last 7 days. Cloud Scheduler renews the Gmail watch daily (it expires after 7 days) and calls `/pubsub` every 5 minutes as a fallback for missed notifications.
+
+- `scripts/setup.sh`: one-time setup of a new project (APIs, Firestore, secrets, service accounts, Cloud Run, Pub/Sub, Scheduler). Prerequisites are listed at the top of the script.
+- `scripts/deploy.sh`: build and deploy a new revision after a code change.
+- Settings (project, region, names) are in `scripts/config.sh`.
+
+| Service account | Used by | Permissions |
+| --- | --- | --- |
+| `alza-bot` | the running service | read the two secrets, read/write Firestore |
+| `alza-bot-invoker` | Pub/Sub push, Cloud Scheduler | invoke the Cloud Run service |
+| `alza-bot-builder` | Cloud Build | build and store the container image |
+
+The Gmail token and Gemini API key are stored in Secret Manager; the token is mounted as a file, the key as an environment variable.
+
 ## Attachments
 
 Supported attachments are sent to Gemini inline together with the email text:
