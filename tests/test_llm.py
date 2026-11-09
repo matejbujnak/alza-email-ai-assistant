@@ -43,7 +43,8 @@ class FakeInteractions:
 def fake_gemini(monkeypatch):
     monkeypatch.setenv("GEMINI_MODEL", "primary")
     monkeypatch.setenv("GEMINI_FALLBACK_MODEL", "fallback")
-    monkeypatch.setattr(llm.rag, "retrieve", lambda query: [])
+    monkeypatch.setattr(llm, "split_questions", lambda email: ["question"])
+    monkeypatch.setattr(llm.rag, "retrieve", lambda queries: [])
 
     def install(responses):
         interactions = FakeInteractions(responses)
@@ -96,3 +97,21 @@ def test_input_contains_prompt_and_attachment_blocks(make_email):
 def test_prompt_has_no_attachment_sections_without_files(make_email):
     prompt = llm.build_prompt(make_email())
     assert "<attachments>" not in prompt and "<skipped_attachments>" not in prompt
+
+
+def test_split_questions_returns_model_list(monkeypatch, make_email):
+    reply = SimpleNamespace(output_text='{"questions": ["Cena Premium?", " ", "Kryje krádež?"]}')
+    calls = []
+    interactions = SimpleNamespace(create=lambda **kwargs: calls.append(kwargs) or reply)
+    monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(interactions=interactions))
+
+    assert llm.split_questions(make_email(body="Cena Premium? Kryje krádež?")) == ["Cena Premium?", "Kryje krádež?"]
+    assert calls[0]["response_format"]["mime_type"] == "application/json"
+
+
+def test_split_questions_falls_back_to_whole_email(monkeypatch, make_email):
+    def failing_create(**kwargs):
+        raise RuntimeError("429")
+
+    monkeypatch.setattr(llm, "get_client", lambda: SimpleNamespace(interactions=SimpleNamespace(create=failing_create)))
+    assert llm.split_questions(make_email(body="Ahoj", subject="Otázka")) == ["Otázka\nAhoj"]

@@ -44,14 +44,26 @@ def chunk(heading: str) -> Chunk:
 
 
 def test_retrieve_ranks_by_similarity_and_applies_threshold(monkeypatch):
-    chunks = [chunk("far"), chunk("best"), chunk("close"), chunk("off-topic")]
-    vectors = [[0.6, 0.8], [1.0, 0.0], [0.8, 0.6], [0.0, 1.0]]
+    chunks = [chunk("far"), chunk("best"), chunk("close"), chunk("off-topic"), chunk("fourth")]
+    vectors = [[0.6, 0.8], [1.0, 0.0], [0.8, 0.6], [0.0, 1.0], [0.75, 0.66]]
     monkeypatch.setattr(rag, "load_index", lambda: (chunks, vectors))
-    monkeypatch.setattr(rag, "embed_query", lambda query: [1.0, 0.0])
+    monkeypatch.setattr(rag, "embed_queries", lambda queries: [[1.0, 0.0]])
 
-    results = rag.retrieve("question", top_k=3, min_score=0.7)
+    results = rag.retrieve(["question"], min_score=0.7)
 
-    assert [(r.chunk.heading, round(r.score, 2)) for r in results] == [("best", 1.0), ("close", 0.8)]
+    assert [(r.chunk.heading, round(r.score, 2)) for r in results] == [("best", 1.0), ("close", 0.8), ("fourth", 0.75)]
+
+
+def test_retrieve_gives_each_question_its_own_sections(monkeypatch):
+    chunks = [chunk("price"), chunk("price-2"), chunk("price-3"), chunk("theft")]
+    vectors = [[1.0, 0.0], [0.99, 0.14], [0.98, 0.2], [0.0, 1.0]]
+    monkeypatch.setattr(rag, "load_index", lambda: (chunks, vectors))
+    monkeypatch.setattr(rag, "embed_queries", lambda queries: [[1.0, 0.0], [0.0, 1.0]])
+
+    headings = [r.chunk.heading for r in rag.retrieve(["How much?", "Is theft covered?"], min_score=0.5)]
+
+    # Two sections per question, so the weaker "theft" topic isn't crowded out by price sections.
+    assert headings == ["price", "theft", "price-2"]
 
 
 def test_prompt_contains_knowledge_excerpts(make_email):
@@ -67,8 +79,10 @@ def test_prompt_states_when_no_knowledge_was_found(make_email):
 
 
 def test_retrieval_failure_degrades_to_no_knowledge(monkeypatch, make_email):
-    def failing_retrieve(query):
+    def failing_retrieve(queries):
         raise RuntimeError("embedding API down")
+
+    monkeypatch.setattr(llm, "split_questions", lambda email: ["question"])
 
     monkeypatch.setattr(llm.rag, "retrieve", failing_retrieve)
     assert llm.find_knowledge(make_email()) == []

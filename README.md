@@ -77,6 +77,20 @@ sequenceDiagram
 
 `knowledge/alzacare-plus/` contains the documents the assistant answers company-specific questions from. Each `##` section becomes one chunk, embedded with `gemini-embedding-2` into `knowledge/index.json`. After editing any document, rebuild the index with `uv run python -m app.rag build` (a test fails if the index is out of date). **AlzaCare+ is a fictional service created for this proof of concept**; its name, prices and terms are invented and do not describe any real Alza product or its actual terms.
 
+Before searching, the email is split into separate questions (one structured-output call), and each question gets its own share of the top sections. One embedding for a whole email with several questions missed some topics.
+
+### Evaluation
+
+`uv run python -m evals.run` runs 20 test emails (`evals/cases.json`) three times each: answerable questions, questions it must decline (product prices, order status, delivery times), several questions in one email, English, Czech and German, and a prompt injection. It checks that the expected sections were retrieved, that required facts (e.g. prices) appear, and asks an LLM judge whether the reply meets the case's criterion. It uses the same API quota as the deployed assistant, so don't run it while the assistant is in use.
+
+| | Before question splitting | After |
+| --- | --- | --- |
+| Expected sections retrieved | 14/15 | 15/15 |
+| Replies passing | 53/60 (88 %) | 59/60 (98 %) |
+| Email with three questions | 0/3 | 3/3 |
+
+Limits: the judge is the same small model as the assistant (the stronger one has only 20 free requests a day), so failures were reviewed by hand. That review found a judge mistake and a real issue it missed: a Czech question was sometimes answered in Slovak or a Czech-Slovak mix, likely because the knowledge base is in Slovak.
+
 ## Development
 
 Requires [uv](https://docs.astral.sh/uv/).

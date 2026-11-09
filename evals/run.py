@@ -25,8 +25,8 @@ from app.try_reply import build_message
 CASES_FILE = Path(__file__).parent / "cases.json"
 RESULTS_DIR = Path(__file__).parent / "results"
 # The free tier allows 15 requests per minute and the deployed assistant shares the quota.
-# Each run makes two requests (reply and judge), so this keeps the eval at about 10 a minute.
-SECONDS_PER_RUN = 12
+# Each run makes three requests (question split, reply, judge): about 10 a minute.
+SECONDS_PER_RUN = 18
 RETRY_DELAY_SECONDS = 40
 
 JUDGE_INSTRUCTION = """\
@@ -39,6 +39,7 @@ Judge only the criterion; extra correct information is fine.
 @dataclass
 class CaseResult:
     id: str
+    questions: list[str]
     retrieved: list[str]
     retrieval_ok: bool | None
     runs: list[dict] = field(default_factory=list)
@@ -71,11 +72,12 @@ def judge(case: dict, reply: str) -> tuple[bool, str]:
 
 
 def run_case(case: dict, runs: int) -> CaseResult:
-    retrieved = [k.chunk.heading for k in with_retry(lambda: rag.retrieve(case["body"]))]
-    expected = case["sections"]
-    result = CaseResult(case["id"], retrieved, all(s in retrieved for s in expected) if expected else None)
-
     email = parse_email(build_message("customer@example.com", "", case["body"], []).as_bytes(), "eval", "eval")
+    questions = llm.split_questions(email)
+    retrieved = [k.chunk.heading for k in with_retry(lambda: rag.retrieve(questions))]
+    expected = case["sections"]
+    result = CaseResult(case["id"], questions, retrieved, all(s in retrieved for s in expected) if expected else None)
+
     for _ in range(runs):
         start = time.monotonic()
         reply = with_retry(lambda: llm.generate_reply(email))

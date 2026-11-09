@@ -24,6 +24,9 @@ INDEX_FILE = KNOWLEDGE_DIR / "index.json"
 EMBEDDING_MODEL = "gemini-embedding-2"
 DIMENSIONS = 768
 TOP_K = 4
+# With several questions in one email, each gets an equal share, but at least 2 sections.
+MIN_PER_QUESTION = 2
+MAX_RESULTS = 8
 # Calibrated on sample queries: clearly off-topic questions score below ~0.6, relevant ones
 # above ~0.68. Borderline queries pass through; the prompt decides whether the context answers them.
 MIN_SCORE = 0.6
@@ -101,8 +104,8 @@ def embed_documents(chunks: list[Chunk]) -> list[list[float]]:
     return _embed([document_text(c) for c in chunks])
 
 
-def embed_query(query: str) -> list[float]:
-    return _embed([f"task: search result | query: {query}"])[0]
+def embed_queries(queries: list[str]) -> list[list[float]]:
+    return _embed([f"task: search result | query: {q}" for q in queries])
 
 
 def dump_index(index: dict) -> str:
@@ -137,13 +140,20 @@ def load_index() -> tuple[list[Chunk], list[list[float]]]:
     return chunks, [c["embedding"] for c in index["chunks"]]
 
 
-def retrieve(query: str, top_k: int = TOP_K, min_score: float = MIN_SCORE) -> list[ScoredChunk]:
+def retrieve(queries: list[str], min_score: float = MIN_SCORE) -> list[ScoredChunk]:
+    """Top sections for each query, merged without duplicates and ordered by score."""
     chunks, vectors = load_index()
-    query_vector = embed_query(query)
-    # Embeddings are unit-normalized, so the dot product equals cosine similarity.
-    scored = [ScoredChunk(c, sum(a * b for a, b in zip(query_vector, v))) for c, v in zip(chunks, vectors)]
-    scored.sort(key=lambda s: s.score, reverse=True)
-    return [s for s in scored[:top_k] if s.score >= min_score]
+    per_query = max(MIN_PER_QUESTION, TOP_K // len(queries))
+    best: dict[str, ScoredChunk] = {}
+    for query_vector in embed_queries(queries):
+        # Embeddings are unit-normalized, so the dot product equals cosine similarity.
+        scored = [ScoredChunk(c, sum(a * b for a, b in zip(query_vector, v))) for c, v in zip(chunks, vectors)]
+        scored.sort(key=lambda s: s.score, reverse=True)
+        for hit in scored[:per_query]:
+            current = best.get(hit.chunk.id)
+            if hit.score >= min_score and (current is None or hit.score > current.score):
+                best[hit.chunk.id] = hit
+    return sorted(best.values(), key=lambda s: s.score, reverse=True)[:MAX_RESULTS]
 
 
 if __name__ == "__main__":
