@@ -30,3 +30,6 @@ logs/
 
 # --- Personal notes ---
 notes/
+
+# --- Evaluation outputs ---
+evals/results/
