@@ -1,6 +1,6 @@
 import pytest
 
-from app.gmail_client import build_reply, get_credentials, strip_quoted_reply
+from app.gmail_client import build_reply, get_credentials, split_quoted_reply
 
 
 def test_parse_email_extracts_fields(make_email):
@@ -58,26 +58,49 @@ wrote:
 """
 
 
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        (GMAIL_REPLY, "Ako posudzujete náhodné poškodenie?"),
-        ("Ďakujem\n\nne 8. 11. 2026 o 17:29 Bot <bot@example.com> napísal(a):\n> Text", "Ďakujem"),
-        ("Ďakujem\n> Text bez úvodného riadku", "Ďakujem"),
-        ("Tu je chyba:\n> Error 42 occurred", "Tu je chyba:"),
-        ("Bez citácie.\n", "Bez citácie.\n"),
-        ("> citát\nMoja odpoveď medzi citátmi\n> ďalší citát\nKoniec", "> citát\nMoja odpoveď medzi citátmi\n> ďalší citát\nKoniec"),
-        ("> Iba preposlaný citát", "> Iba preposlaný citát"),
-    ],
-    ids=["gmail-wrapped-attribution", "slovak-attribution", "quote-without-attribution",
-         "own-colon-line-kept", "no-quote", "interleaved", "only-quote"],
+OUTLOOK_REPLY = (
+    "No dobre a druhá najlepšia vec ?\r\n"
+    "________________________________\r\n"
+    "From: Matej Alza Bot <matej.alza.bot@gmail.com>\r\n"
+    "Sent: 09 November 2026 18:17\r\n"
+    "To: Bujnak, Matej <bujnama3@fit.cvut.cz>\r\n"
+    "Subject: Re: Test\r\n"
+    "\r\n"
+    "Dobrý deň,\r\n"
+    "AlzaCare+ ponúka dva varianty.\r\n"
 )
-def test_strip_quoted_reply(text, expected):
-    assert strip_quoted_reply(text) == expected
 
 
-def test_parsed_body_excludes_quoted_reply(make_email):
-    assert make_email(body=GMAIL_REPLY).body == "Ako posudzujete náhodné poškodenie?"
+@pytest.mark.parametrize(
+    ("text", "new", "quoted"),
+    [
+        (GMAIL_REPLY, "Ako posudzujete náhodné poškodenie?", "On Sun, Nov 8, 2026 at 5:29 PM"),
+        ("Ďakujem\n\nne 8. 11. 2026 o 17:29 Bot <bot@example.com> napísal(a):\n> Text", "Ďakujem", "napísal(a):\nText"),
+        ("Ďakujem\n> Text bez úvodného riadku", "Ďakujem", "Text bez úvodného riadku"),
+        ("Tu je chyba:\n> Error 42 occurred", "Tu je chyba:", "Error 42 occurred"),
+        (OUTLOOK_REPLY, "No dobre a druhá najlepšia vec ?", "From: Matej Alza Bot"),
+        ("Díky\n\nOd: Bot <bot@example.com>\nOdesláno: 9. listopadu 2026 18:17\nPředmět: Re: Test\n\nText", "Díky", "Od: Bot"),
+        ("Thanks\n-----Original Message-----\nFrom: Bot\nText", "Thanks", "-----Original Message-----"),
+        ("Bez citácie.\n", "Bez citácie.\n", ""),
+        ("> citát\nMoja odpoveď\n> ďalší citát\nKoniec", "> citát\nMoja odpoveď\n> ďalší citát\nKoniec", ""),
+        ("> Iba preposlaný citát", "> Iba preposlaný citát", ""),
+        ("Od: zajtra mám čas.\nStačí?", "Od: zajtra mám čas.\nStačí?", ""),
+    ],
+    ids=["gmail-wrapped-attribution", "slovak-attribution", "quote-without-attribution", "own-colon-line-kept",
+         "outlook", "outlook-czech", "original-message", "no-quote", "interleaved", "only-quote",
+         "from-word-without-header"],
+)
+def test_split_quoted_reply(text, new, quoted):
+    new_text, quoted_text = split_quoted_reply(text)
+    assert new_text == new
+    assert quoted in quoted_text
+    assert bool(quoted_text) == bool(quoted)
+
+
+def test_parsed_email_keeps_quote_separately(make_email):
+    email = make_email(body=OUTLOOK_REPLY)
+    assert email.body == "No dobre a druhá najlepšia vec ?"
+    assert "AlzaCare+ ponúka dva varianty." in email.quoted
 
 
 def test_missing_token_explains_how_to_log_in(monkeypatch, tmp_path):
