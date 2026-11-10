@@ -43,7 +43,14 @@ def test_reply_is_marked_as_automatic(make_email):
 
 def test_reply_body_keeps_diacritics(make_email):
     reply = build_reply(make_email(), "Ďakujeme, žltý kôň.")
-    assert reply.get_content().strip() == "Ďakujeme, žltý kôň."
+    assert reply.get_body(("plain",)).get_content().strip() == "Ďakujeme, žltý kôň."
+
+
+def test_reply_has_html_paragraphs(make_email):
+    reply = build_reply(make_email(), "Dobrý deň,\n\n- prvý <bod>\n- druhý\n\nAI Assistant")
+    assert reply.get_body(("html",)).get_content().strip() == (
+        "<p>Dobrý deň,</p><p>- prvý &lt;bod&gt;<br>- druhý</p><p>AI Assistant</p>"
+    )
 
 
 GMAIL_REPLY = """Ako posudzujete náhodné poškodenie?

@@ -1,4 +1,5 @@
 import base64
+import html
 import re
 import os
 import sys
@@ -168,7 +169,14 @@ def build_reply(original: IncomingEmail, text: str) -> EmailMessage:
     # RFC 3834: tells other auto-responders not to reply to us (prevents bot loops).
     reply["Auto-Submitted"] = "auto-replied"
     reply.set_content(text)
+    # Mobile clients hard-wrap long plain-text lines; an HTML part lets paragraphs flow.
+    reply.add_alternative(to_html(text), subtype="html")
     return reply
+
+
+def to_html(text: str) -> str:
+    paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
+    return "".join(f"<p>{html.escape(p).replace(chr(10), '<br>')}</p>" for p in paragraphs)
 
 
 def send_reply(service, original: IncomingEmail, text: str) -> None:
